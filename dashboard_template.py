@@ -236,36 +236,13 @@ def build_dashboard_html(cricket_data: list, profile_img_src: str) -> str:
   .ring-rotate {{ animation: spinSlow 16s linear infinite; }}
 
   /* ============= TOP SCROLL PROGRESS ============= */
-  .scroll-progress-wrap {{
-    position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 60;
-    pointer-events: none;
-    will-change: transform;
-  }}
   .scroll-progress {{
-    width: 100%; height: 100%;
+    position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 60;
     background: linear-gradient(90deg, var(--bat) 0%, var(--bowl) 100%);
     transform-origin: 0 50%;
     transform: scaleX(0);
     transition: transform .12s linear;
     box-shadow: 0 0 12px var(--bat-glow);
-  }}
-
-  /* ============= FIXED HEADER (always on top) ============= */
-  #appHeader {{
-    transition: background .3s ease, box-shadow .3s ease, border-color .3s ease;
-    will-change: transform;
-    backface-visibility: hidden;
-    contain: layout paint;
-  }}
-  #appHeader > * {{ will-change: auto; }}
-  #appHeader.is-scrolled {{
-    background: color-mix(in srgb, var(--bg-0) 92%, transparent) !important;
-    box-shadow: 0 8px 24px -12px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.04) inset;
-    border-bottom-color: rgba(255,255,255,.08);
-  }}
-  /* Body offset on iOS Safari fallback when env(safe-area) is present */
-  @supports (padding: max(0px)) {{
-    #appHeader {{ padding-top: max(0px, env(safe-area-inset-top)); }}
   }}
 
   /* ============= TABS ============= */
@@ -513,12 +490,10 @@ def build_dashboard_html(cricket_data: list, profile_img_src: str) -> str:
 
   /* ============= PRINT ============= */
   @media print {{
-    .app-bg, .app-grain, .particles, .scroll-progress, .scroll-progress-wrap, .scroll-top, .toast-wrap,
+    .app-bg, .app-grain, .particles, .scroll-progress, .scroll-top, .toast-wrap,
     #openFilters, #activeFiltersBar, .mobile-tabbar, #filterDrawer,
     nav#topTabs button[data-active="false"] {{ display: none !important; }}
     body, html {{ background: #fff !important; color: #000 !important; }}
-    main {{ padding-top: 0 !important; }}
-    #appHeader {{ position: static !important; box-shadow: none !important; border-bottom: 1px solid #ddd !important; background: #fff !important; }}
     .glass, .glass-strong {{ background: #fff !important; border: 1px solid #ddd !important; box-shadow: none !important; }}
     [data-tab-pane] {{ display: block !important; page-break-before: auto; }}
     [data-tab-pane].hidden {{ display: block !important; }}
@@ -535,10 +510,10 @@ def build_dashboard_html(cricket_data: list, profile_img_src: str) -> str:
 <div class="particles" id="particles" aria-hidden="true"></div>
 
 <!-- Scroll progress bar -->
-<div class="scroll-progress-wrap" id="scrollProgressWrap"><div class="scroll-progress" id="scrollProgress"></div></div>
+<div class="scroll-progress" id="scrollProgress"></div>
 
-<!-- ============= TOP NAV (always-on-top fixed header) ============= -->
-<header id="appHeader" class="fixed top-0 left-0 right-0 z-40 backdrop-blur-xl border-b border-white/5" style="background: color-mix(in srgb, var(--bg-1) 80%, transparent); -webkit-backdrop-filter: blur(16px); will-change: background, box-shadow;">
+<!-- ============= TOP NAV ============= -->
+<header class="sticky top-0 z-40 backdrop-blur-xl border-b border-white/5" style="background: color-mix(in srgb, var(--bg-1) 80%, transparent);">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4">
     <div class="flex items-center gap-2.5 min-w-0">
       <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-bat-400 to-bowl-500 grid place-items-center shadow-glow shrink-0 relative overflow-hidden">
@@ -584,7 +559,7 @@ def build_dashboard_html(cricket_data: list, profile_img_src: str) -> str:
 </header>
 
 <!-- ============= MAIN ============= -->
-<main class="max-w-7xl mx-auto px-4 sm:px-6 pb-32 md:pb-12 pt-14 sm:pt-16">
+<main class="max-w-7xl mx-auto px-4 sm:px-6 pb-32 md:pb-12">
 
   <!-- HERO -->
   <section class="pt-6 sm:pt-10 reveal">
@@ -2102,144 +2077,20 @@ window.CRICKET_DATA = {data_json};
     }}, 2200);
   }}
 
-  // Scroll progress + scroll-to-top toggle + fixed-header polish
+  // Scroll progress + scroll-to-top toggle
   function setupScroll() {{
     const bar = $('#scrollProgress');
     const top = $('#scrollTopBtn');
-    const hdr = $('#appHeader');
     const onScroll = () => {{
       const h = document.documentElement;
       const max = (h.scrollHeight - h.clientHeight) || 1;
       const pct = Math.min(1, h.scrollTop / max);
       if (bar) bar.style.transform = `scaleX(${{pct}})`;
       if (top) top.classList.toggle('show', h.scrollTop > 400);
-      if (hdr) hdr.classList.toggle('is-scrolled', h.scrollTop > 8);
     }};
     window.addEventListener('scroll', onScroll, {{ passive: true }});
     if (top) top.addEventListener('click', () => window.scrollTo({{ top:0, behavior:'smooth' }}));
     onScroll();
-  }}
-
-  // Pin header to the actual browser viewport, even when parent (Streamlit) page scrolls.
-  // Inside an iframe, position:fixed only pins to the iframe viewport. When the parent
-  // page is what scrolls (typical for a tall components.html iframe), the iframe itself
-  // moves up with the page, dragging the header off-screen. We read the parent's
-  // scrollY each animation frame and translate the header down by exactly that offset
-  // so it stays glued to the top of the browser window.
-  //
-  // Performance notes for smoothness (no lag):
-  //   • Cache the iframe's absolute Y once; recompute only on resize / periodically.
-  //     Per-frame reads use only parent.scrollY (cheap, no layout reflow).
-  //   • Updates run inside a requestAnimationFrame loop while scrolling, kept alive
-  //     for ~280ms after the last input event to cover momentum scroll on touch.
-  //   • Uses translate3d + will-change:transform → GPU-composited, no relayout.
-  //   • Wheel + touchmove + scroll + keydown listeners on every accessible parent
-  //     window so the loop wakes up the instant input begins (no startup lag).
-  function setupViewportPin() {{
-    const hdr = document.getElementById('appHeader');
-    const barWrap = document.getElementById('scrollProgressWrap');
-    if (!hdr) return;
-
-    let parentWin = null;
-    let frameEl = null;
-
-    try {{
-      if (window.parent && window.parent !== window) {{
-        void window.parent.document; // probe same-origin
-        parentWin = window.parent;
-        frameEl = window.frameElement;
-      }}
-    }} catch (e) {{ return; }}
-    if (!frameEl || !parentWin) return;
-
-    // Cache iframe's absolute Y in parent document. Updates only on resize / interval.
-    let iframeAbsTop = 0;
-    function recomputeOffset() {{
-      try {{
-        const rect = frameEl.getBoundingClientRect();
-        const py = parentWin.scrollY || parentWin.pageYOffset || 0;
-        iframeAbsTop = rect.top + py;
-      }} catch (e) {{}}
-    }}
-
-    let lastTy = -1;
-    function applyTransform(ty) {{
-      if (ty === lastTy) return;
-      lastTy = ty;
-      const t = `translate3d(0,${{ty}}px,0)`;
-      hdr.style.transform = t;
-      if (barWrap) barWrap.style.transform = t;
-      // Polished "scrolled" state once we're off the very top
-      if (ty > 4) hdr.classList.add('is-scrolled');
-      else if ((document.documentElement.scrollTop || 0) <= 8) hdr.classList.remove('is-scrolled');
-    }}
-
-    function readPy() {{
-      try {{ return parentWin.scrollY || parentWin.pageYOffset || 0; }} catch (e) {{ return 0; }}
-    }}
-
-    function update() {{
-      const py = readPy();
-      const ty = py > iframeAbsTop ? (py - iframeAbsTop) : 0;
-      applyTransform(ty);
-    }}
-
-    // Animation-frame loop — kept alive while user is scrolling.
-    const IDLE_MS = 280;
-    let rafId = 0;
-    let lastInputTime = 0;
-    function loop() {{
-      update();
-      if (performance.now() - lastInputTime < IDLE_MS) {{
-        rafId = requestAnimationFrame(loop);
-      }} else {{
-        rafId = 0;
-        // Final settle frame to make sure we're aligned exactly
-        update();
-      }}
-    }}
-    function ping() {{
-      lastInputTime = performance.now();
-      if (!rafId) rafId = requestAnimationFrame(loop);
-    }}
-
-    // Attach fast input listeners to every accessible ancestor window.
-    const INPUTS = ['scroll', 'wheel', 'touchmove', 'touchstart', 'keydown'];
-    function bindInputs(w) {{
-      try {{
-        INPUTS.forEach(ev => {{
-          w.addEventListener(ev, ping, {{ passive: true, capture: true }});
-        }});
-      }} catch (e) {{}}
-    }}
-    let walker = parentWin;
-    let safety = 0;
-    while (walker && safety < 8) {{
-      bindInputs(walker);
-      try {{
-        if (walker.parent && walker.parent !== walker) {{
-          void walker.parent.document; // probe
-          walker = walker.parent;
-        }} else break;
-      }} catch (e) {{ break; }}
-      safety++;
-    }}
-    // Iframe itself (in case it scrolls internally too)
-    bindInputs(window);
-
-    // Resize → recompute cached offset, then a fresh update
-    function onResize() {{ recomputeOffset(); ping(); }}
-    try {{ parentWin.addEventListener('resize', onResize); }} catch (e) {{}}
-    window.addEventListener('resize', onResize);
-
-    // Periodic safety net for Streamlit reflows (chart loads, image loads,
-    // sidebar toggles) that can shift the iframe's offset without any input.
-    setInterval(() => {{ recomputeOffset(); update(); }}, 500);
-
-    // Initial
-    recomputeOffset();
-    update();
-    ping(); // start the loop in case page is already scrolled
   }}
 
   // IntersectionObserver-driven reveal (subtle staggered entry as user scrolls)
@@ -2449,7 +2300,6 @@ Best bowling: ${{bowl.best}} · 5W ${{bowl.fiveW}} · 3W ${{bowl.threeW}}`;
     $('#lastUpdated').textContent = new Date().toLocaleDateString('en-US', {{ year:'numeric', month:'short', day:'numeric' }});
     bindEvents();
     setupScroll();
-    setupViewportPin();
     setupReveal();
     setupMagnetic();
     setupTilt();
