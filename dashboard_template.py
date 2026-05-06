@@ -528,7 +528,7 @@ def build_dashboard_html(cricket_data: list, profile_img_src: str) -> str:
       <div class="glass p-5 sm:p-6">
         <div class="flex items-center justify-between mb-4">
           <div>
-            <h3 class="text-lg font-semibold">How he gets out</h3>
+            <h3 class="text-lg font-semibold">How got out</h3>
             <p class="text-xs text-slate-400">Dismissal breakdown</p>
           </div>
           <i data-lucide="pie-chart" class="w-4 h-4 text-slate-500"></i>
@@ -765,16 +765,32 @@ window.CRICKET_DATA = {data_json};
       'lbw':'LBW','runout':'Run Out','run out':'Run Out',
       'stump':'Stumped','stumped':'Stumped','bowled':'Bowled',
       'caught':'Caught','hit wkt':'Hit Wicket','hit wicket':'Hit Wicket',
-      'caught b':'Caught & Bowled','caught and bowled':'Caught & Bowled',
-      'c&b':'Caught & Bowled'
+      'caught b':'Caught Behind','caught and bowled':'Caught Behind',
+      'caught & bowled':'Caught Behind','c&b':'Caught Behind',
+      'caught behind':'Caught Behind'
     }};
     return map[k] || (k.charAt(0).toUpperCase()+k.slice(1));
+  }};
+
+  const normalizeMatchType = t => {{
+    if (!t) return t;
+
+    const clean = String(t).trim();
+    const lower = clean.toLowerCase();
+
+    const map = {{
+      'inter uni': 'Inter University',
+      'inter university': 'Inter University',
+    }};
+
+    return map[lower] || clean;
   }};
 
   const RAW = (window.CRICKET_DATA || []).map((r,i) => ({{
     ...r,
     matchId: r.matchId ?? (i+1),
     Dismissal: normalizeDismissal(r.Dismissal),
+    Match_Type: normalizeMatchType(r.Match_Type),
   }}));
 
   const allYears  = [...new Set(RAW.map(r => r.Year).filter(Boolean))].sort();
